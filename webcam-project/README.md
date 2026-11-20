@@ -31,3 +31,14 @@ The two scripts use different ports, so they can run at the same time.
 
 Recognition uses cosine similarity with a threshold of 0.363 (the OpenCV
 SFace reference value).
+
+## GUI
+
+From the repo root, run:
+
+    python main_gui.py
+
+The GUI uses the models (`yunet.onnx`, `sface.onnx`) and enrolled faces in
+`webcam-project/`, so it shares enrollments with `face_recognition.py`.
+Buttons: Enroll Mode, Save Face, Recognition Mode, Log Attempt (plus Stop
+Camera). Recognition events are sent over UDP on port 5006.

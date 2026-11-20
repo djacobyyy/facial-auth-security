@@ -1,5 +1,5 @@
 """Standalone Windows face enrollment/recognition GUI with UDP Wireshark events.
-Requires opencv-contrib-python, numpy, Pillow, yunet.onnx, sface.onnx.
+Requires opencv-python (includes FaceDetectorYN/FaceRecognizerSF), numpy, Pillow, yunet.onnx, sface.onnx.
 """
 import json
 import re
@@ -16,8 +16,12 @@ import numpy as np
 from PIL import Image, ImageTk
 
 BASE = Path(__file__).resolve().parent
-THRESHOLD = 0.30
-UDP_ADDRESS = ("127.0.0.1", 5005)
+# Models and enrolled faces live in webcam-project/ (shared with face_recognition.py);
+# fall back to BASE if this file has been moved into that folder.
+DATA_DIR = BASE / "webcam-project" if (BASE / "webcam-project" / "yunet.onnx").is_file() else BASE
+THRESHOLD = 0.363  # OpenCV's SFace reference cosine threshold (matches webcam-project/face_recognition.py)
+UDP_PORT = 5006  # recognition events; face_detection.py uses 5005
+UDP_ADDRESS = ("127.0.0.1", UDP_PORT)
 
 
 class FaceGUI:
@@ -26,8 +30,11 @@ class FaceGUI:
         root.title("Facial Authentication & Network Logging")
         root.geometry("1100x790")
         root.minsize(860, 650)
-        self.detector = cv2.FaceDetectorYN.create(str(BASE / "yunet.onnx"), "", (320, 320), 0.9)
-        self.recognizer = cv2.FaceRecognizerSF.create(str(BASE / "sface.onnx"), "")
+        for model in ("yunet.onnx", "sface.onnx"):
+            if not (DATA_DIR / model).is_file():
+                raise FileNotFoundError(f"Missing {model}; looked in folder: {DATA_DIR}")
+        self.detector = cv2.FaceDetectorYN.create(str(DATA_DIR / "yunet.onnx"), "", (320, 320), 0.9)
+        self.recognizer = cv2.FaceRecognizerSF.create(str(DATA_DIR / "sface.onnx"), "")
         self.enrolled = {}
         self.load_faces()
         self.cap = None
@@ -48,12 +55,12 @@ class FaceGUI:
             if self.receiver:
                 self.receiver.close()
             self.receiver = None
-            messagebox.showwarning("UDP listener", f"Could not bind UDP port 5005: {exc}\nOutgoing UDP logging will still work if another listener is using the port.")
+            messagebox.showwarning("UDP listener", f"Could not bind UDP port {UDP_PORT}: {exc}\nOutgoing UDP logging will still work if another listener is using the port.")
 
         top = ttk.Frame(root, padding=12)
         top.pack(fill="x")
         ttk.Label(top, text="Facial Authentication System", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        ttk.Label(top, text="Local webcam  •  YuNet / SFace  •  UDP 127.0.0.1:5005").pack(anchor="w")
+        ttk.Label(top, text=f"Local webcam  •  YuNet / SFace  •  UDP 127.0.0.1:{UDP_PORT}").pack(anchor="w")
 
         controls = ttk.Frame(root, padding=(12, 0, 12, 10))
         controls.pack(fill="x")
@@ -90,7 +97,7 @@ class FaceGUI:
 
     def load_faces(self):
         self.enrolled.clear()
-        for path in sorted(BASE.glob("*_face.npy")):
+        for path in sorted(DATA_DIR.glob("*_face.npy")):
             name = path.stem.removesuffix("_face").replace("_", " ").title()
             self.enrolled[name] = np.load(path, allow_pickle=False)
 
@@ -145,7 +152,7 @@ class FaceGUI:
             messagebox.showwarning("Name", "Enter a name using letters, numbers, spaces, _ or - (max 50 chars).")
             return
         filename = re.sub(r"[ -]+", "_", name).strip("_") + "_face.npy"
-        target = BASE / filename
+        target = DATA_DIR / filename
         if target.exists() and not messagebox.askyesno("Overwrite", f"Replace enrollment for {name}?"):
             return
         try:
@@ -189,7 +196,7 @@ class FaceGUI:
                     self.receiver.recvfrom(65535)
                 except (BlockingIOError, OSError):
                     break
-        self.status.set(f"Logged attempt #{self.attempt_id} via UDP :5005")
+        self.status.set(f"Logged attempt #{self.attempt_id} via UDP :{UDP_PORT}")
 
     def tick(self):
         try:
