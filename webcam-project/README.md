@@ -40,5 +40,8 @@ From the repo root, run:
 
 The GUI uses the models (`yunet.onnx`, `sface.onnx`) and enrolled faces in
 `webcam-project/`, so it shares enrollments with `face_recognition.py`.
-Buttons: Enroll Mode, Save Face, Recognition Mode, Log Attempt (plus Stop
-Camera). Recognition events are sent over UDP on port 5006.
+To register someone, type a name under **Register a new face**, click
+**Start camera**, then **Save face**. To verify, click **Start scan**; the
+banner shows *Access granted* or *Not recognized*. The collapsible
+**Network log** under the video has **Log attempt** and auto-log; recognition
+events are sent over UDP on port 5006.
